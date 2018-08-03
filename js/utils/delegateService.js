@@ -26,6 +26,7 @@
        * that will only try to fetch the controller with given handle
        * once the methods are actually called.
        */
+    	// ImoNote: DelegateInstance 类 
       function DelegateInstance(instances, handle) {
         this._instances = instances;
         this.handle = handle;

@@ -3,16 +3,17 @@
  * @name $ionicHistory
  * @module ionic
  * @description
+ * ImoNote: $ionicHistory 记录了用户一路导航过来的视图们，就像浏览器的表现那样！（区别是典型的浏览器有且仅有一个历史栈）
  * $ionicHistory keeps track of views as the user navigates through an app. Similar to the way a
  * browser behaves, an Ionic app is able to keep track of the previous view, the current view, and
  * the forward view (if there is one).  However, a typical web browser only keeps track of one
  * history stack in a linear fashion.
- *
+ * ImoNote: 不像传统的浏览器环境，apps 和 webapps 有平行无依赖关系的历史们（e.g. tabs：各个 tab 有各自的历史栈，互相无依赖关系）
  * Unlike a traditional browser environment, apps and webapps have parallel independent histories,
  * such as with tabs. Should a user navigate few pages deep on one tab, and then switch to a new
  * tab and back, the back button relates not to the previous tab, but to the previous pages
  * visited within _that_ tab.
- *
+ * ImoNote: `$ionicHistory` 使能了这种平行的历史架构
  * `$ionicHistory` facilitates this parallel history architecture.
  */
 
@@ -23,6 +24,7 @@ IonicModule
   '$location',
   '$window',
   '$timeout',
+  // ImoNote:TODO: 下面两个不太了解 
   '$ionicViewSwitcher',
   '$ionicNavViewDelegate',
 function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $ionicNavViewDelegate) {
@@ -44,6 +46,15 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
   var stateChangeCounter = 0;
   var lastStateId, nextViewOptions, deregisterStateChangeListener, nextViewExpireTimer, forcedNav;
 
+	/**
+	 * ImoNote:
+	 * - histories 和 views 都是字典，一个记录历史，一个记录视图
+	 * - stack 记录的也是 view 吧？因为看到一个 stack[0].go 的用法（go 方法是 View 实例的方法）
+	 * - （stack 可能：有 stateName/stateParams,有 url，有 scope；这些可能统统来自 initialize 时传入的 data 参数？！） 
+	 * TODO: 
+	 * histories 怎么用呢？
+	 * views 怎么来的呢？三个 view（back forword current）可以隶属不同的 history？
+	 */
   var viewHistory = {
     histories: { root: { historyId: 'root', parentHistoryId: null, stack: [], cursor: -1 } },
     views: {},
@@ -52,7 +63,24 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     currentView: null
   };
 
-  var View = function() {};
+	// ImoNote: View 类
+	var View = function() {};
+	/**
+	 * ImoNote: 这里的 data 形如：
+	 * {
+	 *   backViewId
+	 *   canSwipeBack: true
+	 *   forwordViewId
+	 *   historyId: "ion2"
+	 *   index: number
+	 *   stateId: "tab.dash"
+	 *   stateName: "tab.dash"
+	 *   stateParams
+	 *   url: "/tab/dash"
+	 *   viewId: "ion5"
+	 * }
+	 * scope ???
+	 */
   View.prototype.initialize = function(data) {
     if (data) {
       for (var name in data) this[name] = data[name];
@@ -86,7 +114,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     }
   };
 
-
+	// ImoNote: 根据 getBackView 和 getForwardView，view 还可能有 backViewId,forwardViewId 两个属性
   function getViewById(viewId) {
     return (viewId ? viewHistory.views[ viewId ] : null);
   }
@@ -103,6 +131,10 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     return (historyId ? viewHistory.histories[ historyId ] : null);
   }
 
+	/**
+	 * ImoNote: viewHistory 初始化时有 'root' 历史的 parentHistoryId 是 null 很好理解，
+	 * TODO: 但是下面函数新添加的 history 的 parentHistoryId 来自父 scope 的 $historyId 怎么理解呢？？？
+	 */
   function getHistory(scope) {
     var histObj = getParentHistoryObj(scope);
 
@@ -119,6 +151,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     return getHistoryById(histObj.historyId);
   }
 
+	// ImoNote: historyObj 记录 historyId 和 scope；可能需要遍历 scope chain 来找到，默认值为 'root' 和 $rootScope
   function getParentHistoryObj(scope) {
     var parentScope = scope;
     while (parentScope) {
@@ -133,12 +166,14 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     return { historyId: 'root', scope: $rootScope };
   }
 
+	// ImoNote: 根据 viewId 查找 view，并将 view 作为 viewHistory.currentView，相关的 backView 和 forwardView 更新到 viewHistory
   function setNavViews(viewId) {
     viewHistory.currentView = getViewById(viewId);
     viewHistory.backView = getBackView(viewHistory.currentView);
     viewHistory.forwardView = getForwardView(viewHistory.currentView);
   }
 
+	// ImoNote: 获取唯一 stateId 的方法（要么根据 $state.current.name 和 $state.params 生成唯一 id；下策是使用工具方法生成）
   function getCurrentStateId() {
     var id;
     if ($state && $state.current && $state.current.name) {
@@ -156,6 +191,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     return ionic.Utils.nextUid();
   }
 
+	// ImoNote: 仅一层地深拷贝 $state.params 对象
   function getCurrentStateParams() {
     var rtn;
     if ($state && $state.params) {
@@ -172,6 +208,17 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
 
   return {
 
+		// TODO:
+		/**
+		 * ImoNote: 
+		 * 仅在 /js/angular/controller/navViewController.js,有 `var registerData = $ionicHistory.register($scope, viewLocals);`
+		 * - parentScope 会是 $ionicNavView 控制器对应的 $scope
+		 * - viewLocals 
+		 *   => navViewController.js, (navViewController)self.register 
+		 *   => navView.js, navViewCtrl.register(viewLocals) 
+		 *   => navView.js, var viewLocals = $state.$current && $state.$current.locals[viewData.name]; // TODO:
+		 *   (P.S. 每当 ionNavView 这个指令的 compile 方法被调用的时候，总会 register)
+		 */
     register: function(parentScope, viewLocals) {
 
       var currentStateId = getCurrentStateId(),
@@ -186,11 +233,13 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
           url = $location.url(),
           tmp, x, ele;
 
+      // ImoNote: stateChangeCounter 是用来记录 lastStateId 的变化次数的
       if (lastStateId !== currentStateId) {
         lastStateId = currentStateId;
         stateChangeCounter++;
       }
 
+			// ImoNote: 当调用了 goToHistoryRoot 方法的时候，forcedNav 才有值
       if (forcedNav) {
         // we've previously set exactly what to do
         viewId = forcedNav.viewId;
@@ -254,6 +303,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
       } else if (currentView && currentView.historyId !== historyId &&
                 hist.cursor > -1 && hist.stack.length > 0 && hist.cursor < hist.stack.length &&
                 hist.stack[hist.cursor].stateId === currentStateId) {
+				// ImoNote: 切换到一个已经有 views 的不同历史的 case
         // they just changed to a different history and the history already has views in it
         var switchToView = hist.stack[hist.cursor];
         viewId = switchToView.viewId;
@@ -272,6 +322,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
           }
         }
 
+				// ImoNote: 当切换到一个不同的历史，且我们切换到的那个历史存在一个不属于这个历史的 back view 时，最好使用 current view 作为 back view
         // if switching to a different history, and the history of the view we're switching
         // to has an existing back view from a different history than itself, then
         // it's back view would be better represented using the current view as its back view
@@ -291,10 +342,11 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
         }
 
       } else {
-
+				// ImoNote: 唯一使用 $ionicViewSwitcher 的地方
         // create an element from the viewLocals template
         ele = $ionicViewSwitcher.createViewEle(viewLocals);
         if (this.isAbstractEle(ele, viewLocals)) {
+					// ImoNote:TODO: 这个返回结果不是很懂。。
           return {
             action: 'abstractView',
             direction: DIRECTION_NONE,
@@ -302,6 +354,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
           };
         }
 
+				// ImoNote:TODO: 为什么这里直接弃疗使用 ionic.Utils.nextUid 来获取独一 id 了？
         // set a new unique viewId
         viewId = ionic.Utils.nextUid();
 
@@ -384,13 +437,18 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
         if (nextViewOptions.disableBack) viewHistory.views[viewId].backViewId = null;
         if (nextViewOptions.historyRoot) {
           for (x = 0; x < hist.stack.length; x++) {
+						/**
+						 * ImoNote: 在 stack 找到对应的 view（引用类型），修改其 index 为 0，backViewId 和 forwardViewId 为 null
+						 * 在 views 中删除其他 view 的记录
+						 */
             if (hist.stack[x].viewId === viewId) {
               hist.stack[x].index = 0;
               hist.stack[x].backViewId = hist.stack[x].forwardViewId = null;
             } else {
               delete viewHistory.views[hist.stack[x].viewId];
             }
-          }
+					}
+					// ImoNote: stack 变成 [找到的 view]
           hist.stack = [viewHistory.views[viewId]];
         }
         nextViewOptions = null;
@@ -457,6 +515,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
      * @description The app's current view.
      * @returns {object} Returns the current view.
      */
+		// ImoNote: 和 backView 方法类似，有参更新并返回，无参直接获取返回
     currentView: function(view) {
       if (arguments.length) {
         viewHistory.currentView = view;
@@ -498,6 +557,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
      * View B would be the current view.
      * @returns {object} Returns the back view.
      */
+		// ImoNote: 传参表示参数 view 更新到 viewHistory.backView，并返回 viewHistory.backView(view)；无参返回 viewHistory.backView
     backView: function(view) {
       if (arguments.length) {
         viewHistory.backView = view;
@@ -525,6 +585,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
      * A would be the current view.
      * @returns {object} Returns the forward view.
      */
+		// ImoNote: 和 backView 方法类似，有参更新并返回，无参直接获取返回
     forwardView: function(view) {
       if (arguments.length) {
         viewHistory.forwardView = view;
@@ -548,11 +609,14 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
 
     goToHistoryRoot: function(historyId) {
       if (historyId) {
-        var hist = getHistoryById(historyId);
+				var hist = getHistoryById(historyId);
+				// ImoNote: 如果指定 history 的栈非空，即 root 存在，那么继续
         if (hist && hist.stack.length) {
+					// ImoNote: 如果当前 currentView.viewId 已经是指定 history 的 stack 的栈底了，那么已经达到目标，直接返回即可
           if (viewHistory.currentView && viewHistory.currentView.viewId === hist.stack[0].viewId) {
             return;
-          }
+					}
+					// ImoNote: 否则，设置 forceNav
           forcedNav = {
             viewId: hist.stack[0].viewId,
             action: ACTION_MOVE_BACK,
@@ -687,10 +751,17 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
     /**
      * @ngdoc method
      * @name $ionicHistory#clearCache
-	 * @return promise
+	   * @return promise
      * @description Removes all cached views within every {@link ionic.directive:ionNavView}.
      * This both removes the view element from the DOM, and destroy it's scope.
      */
+		/**
+		 * ImoNote: 
+		 * 唯一使用 $ionicViewSwitcher 的地方！
+		 *   => navViewDelegate.js, ionic.DelegateService(['clearCache'])
+		 *   => delegateService.js, 
+		 * 这个方法不得了？！看官方注释 view element 是一直在 DOM 中么？
+		 */  
     clearCache: function(stateIds) {
       return $timeout(function() {
         $ionicNavViewDelegate._instances.forEach(function(instance) {
@@ -743,6 +814,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
       return nextViewOptions;
     },
 
+		// ImoNote: 优先通过 viewLocals 判断是否 abstract；如果非，再通过 ele 及其直系子元素判断
     isAbstractEle: function(ele, viewLocals) {
       if (viewLocals && viewLocals.$$state && viewLocals.$$state.self['abstract']) {
         return true;
@@ -794,6 +866,7 @@ function($rootScope, $state, $location, $window, $timeout, $ionicViewSwitcher, $
 
   };
 
+	// ImoNote: ion-side-menu 和 ion-tabs 视为 abstract tags；P.S. ele 这里应该是一个 jq 元素，所以先 [0] 取到原生 element
   function isAbstractTag(ele) {
     return ele && ele.length && /ion-side-menus|ion-tabs/i.test(ele[0].tagName);
   }
